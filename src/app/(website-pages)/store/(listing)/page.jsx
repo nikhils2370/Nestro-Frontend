@@ -1,5 +1,5 @@
 import { fetchProduct } from "@/api/ProductAPI";
-import ProductCard from "@/components/website/ui/ProductCard.jsx";
+import ProductCard from "@/components/website/UI/ProductCard.jsx";
 import Pagination from "@/components/website/store/Pagination";
 
 
