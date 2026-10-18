@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import {
   FiUser,
@@ -22,6 +22,7 @@ import {
   FiHome,
   FiLogOut,
   FiX,
+  FiTruck,
 } from "react-icons/fi";
 import { toast } from "sonner";
 import { client } from "@/utils/helper";
@@ -103,9 +104,11 @@ function EmptyState({ icon: Icon, title, description, action }) {
 export default function AccountPage() {
   const dispatch = useDispatch();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const user = useSelector((state) => state.user.user);
 
-  const [activeTab, setActiveTab] = useState("overview");
+  const initialTab = searchParams.get("tab") || "overview";
+  const [activeTab, setActiveTab] = useState(initialTab);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [editing, setEditing] = useState(false);
@@ -114,6 +117,8 @@ export default function AccountPage() {
   const [addresses, setAddresses] = useState([]);
   const [addressForm, setAddressForm] = useState(null);
   const [editingAddressId, setEditingAddressId] = useState(null);
+  const [orders, setOrders] = useState([]);
+  const [loadingOrders, setLoadingOrders] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -148,6 +153,34 @@ export default function AccountPage() {
       active = false;
     };
   }, [dispatch, router]);
+
+  // Fetch orders when orders tab is active
+  useEffect(() => {
+    let active = true;
+    async function loadOrders() {
+      try {
+        setLoadingOrders(true);
+        const response = await client.get("order/my-orders");
+        if (!active) return;
+        if (response.data?.success && Array.isArray(response.data.orders)) {
+          setOrders(response.data.orders);
+        }
+      } catch (error) {
+        if (!active) return;
+        console.error("Failed to load orders:", error);
+      } finally {
+        if (active) setLoadingOrders(false);
+      }
+    }
+
+    if (activeTab === "orders" || initialTab === "orders") {
+      loadOrders();
+    }
+
+    return () => {
+      active = false;
+    };
+  }, [activeTab, initialTab]);
 
   async function saveProfile(event) {
     event.preventDefault();
@@ -868,21 +901,154 @@ export default function AccountPage() {
       <section className="rounded-2xl border border-[#e8e3dc] bg-white p-5 sm:p-7">
         <SectionHeading
           title="My Orders"
-          description="Your purchases and delivery updates will appear here."
+          description="Track your purchases and view order history."
         />
-        <EmptyState
-          icon={FiPackage}
-          title="Order history is not connected yet"
-          description="Connect this section to your order API to show order numbers, dates, totals, payment status, and delivery progress."
-          action={
-            <Link
-              href="/store"
-              className="inline-flex items-center gap-2 rounded-xl bg-[#806548] px-5 py-3 text-sm font-medium text-white transition hover:bg-[#705239]"
-            >
-              Continue shopping <FiChevronRight />
-            </Link>
-          }
-        />
+
+        {loadingOrders ? (
+          <div className="flex min-h-[220px] items-center justify-center">
+            <div className="flex items-center gap-3 text-sm text-[#8a684b]">
+              <span className="h-5 w-5 animate-spin rounded-full border-2 border-[#8a684b] border-t-transparent" />
+              Loading your orders...
+            </div>
+          </div>
+        ) : orders.length === 0 ? (
+          <EmptyState
+            icon={FiPackage}
+            title="No orders placed yet"
+            description="When you purchase items from Nestro, your order details and delivery status will appear here."
+            action={
+              <Link
+                href="/store"
+                className="inline-flex items-center gap-2 rounded-xl bg-[#806548] px-5 py-3 text-sm font-medium text-white transition hover:bg-[#705239]"
+              >
+                Browse Furniture <FiChevronRight />
+              </Link>
+            }
+          />
+        ) : (
+          <div className="space-y-5">
+            {orders.map((order) => {
+              const statusColors = {
+                Delivered: "bg-emerald-50 text-emerald-700 border-emerald-200",
+                Shipped: "bg-purple-50 text-purple-700 border-purple-200",
+                Processing: "bg-blue-50 text-blue-700 border-blue-200",
+                Pending: "bg-amber-50 text-amber-700 border-amber-200",
+                Cancelled: "bg-red-50 text-red-700 border-red-200",
+              };
+
+              const badgeClass =
+                statusColors[order.orderStatus] ||
+                "bg-stone-50 text-stone-700 border-stone-200";
+
+              const orderDate = order.createdAt
+                ? new Date(order.createdAt).toLocaleDateString("en-IN", {
+                    day: "numeric",
+                    month: "short",
+                    year: "numeric",
+                  })
+                : "—";
+
+              return (
+                <div
+                  key={order._id || order.orderNumber}
+                  className="overflow-hidden rounded-2xl border border-[#e8e3dc] bg-[#fcfbf9] transition-all hover:border-[#cdbda9]"
+                >
+                  {/* Order Top Bar */}
+                  <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#eee8e0] bg-white p-4 sm:px-6">
+                    <div>
+                      <span className="text-xs font-semibold uppercase tracking-wider text-[#9a8a79]">
+                        Order #{order.orderNumber}
+                      </span>
+                      <p className="mt-0.5 text-xs text-[#737782]">
+                        Placed on {orderDate}
+                      </p>
+                    </div>
+
+                    <div className="flex items-center gap-3">
+                      <span
+                        className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-semibold ${badgeClass}`}
+                      >
+                        <span className="h-1.5 w-1.5 rounded-full bg-current" />
+                        {order.orderStatus}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Order Items */}
+                  <div className="divide-y divide-[#f0eae1] p-4 sm:px-6">
+                    {order.items?.map((item, idx) => (
+                      <div
+                        key={item._id || idx}
+                        className="flex items-center gap-4 py-3 first:pt-0 last:pb-0"
+                      >
+                        <div className="h-16 w-16 shrink-0 overflow-hidden rounded-xl bg-stone-100">
+                          {item.thumbnail ? (
+                            <img
+                              src={item.thumbnail}
+                              alt={item.name}
+                              className="h-full w-full object-cover"
+                            />
+                          ) : (
+                            <div className="flex h-full items-center justify-center text-xs text-stone-400">
+                              No image
+                            </div>
+                          )}
+                        </div>
+
+                        <div className="min-w-0 flex-1">
+                          <h4 className="truncate text-sm font-medium text-[#292827]">
+                            {item.name}
+                          </h4>
+                          <p className="mt-1 text-xs text-[#737782]">
+                            Qty: {item.qty} × ₹
+                            {(
+                              Number(item.salePrice || item.price) || 0
+                            ).toLocaleString("en-IN")}
+                          </p>
+                        </div>
+
+                        <div className="text-right">
+                          <span className="text-sm font-semibold text-[#292827]">
+                            ₹
+                            {(
+                              (Number(item.salePrice || item.price) || 0) *
+                              (Number(item.qty) || 1)
+                            ).toLocaleString("en-IN")}
+                          </span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Order Footer Details */}
+                  <div className="flex flex-wrap items-center justify-between gap-4 border-t border-[#eee8e0] bg-white p-4 sm:px-6">
+                    <div className="text-xs text-[#737782]">
+                      <span className="font-medium text-[#292827]">
+                        Delivery to:{" "}
+                      </span>
+                      {order.shippingAddress?.fullName},{" "}
+                      {order.shippingAddress?.city},{" "}
+                      {order.shippingAddress?.state} •{" "}
+                      <span className="capitalize font-medium text-[#8a684b]">
+                        {order.paymentMethod?.toUpperCase()} (
+                        {order.paymentStatus})
+                      </span>
+                    </div>
+
+                    <div className="text-right">
+                      <span className="text-xs text-[#737782]">
+                        Total Amount:{" "}
+                      </span>
+                      <span className="text-base font-bold text-[#806548]">
+                        ₹{(order.totalAmount || 0).toLocaleString("en-IN")}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
       </section>
     );
   }

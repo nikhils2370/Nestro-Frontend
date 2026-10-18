@@ -54,6 +54,8 @@ export default function SigninForm() {
 
       const token = response.data?.token;
       const user = response.data?.user;
+      
+      
 
       if (!token) {
         toast.error("Login token was not received from the server");
@@ -116,7 +118,11 @@ export default function SigninForm() {
       // 6. Success and redirect
       toast.success(response.data.message || "Login successful");
 
+      if (user.role === "admin" || user.role === "superadmin") {
+        router.push("admin");
+      } else {
       router.replace(redirect);
+      }
     } catch (error) {
       console.error("Login Error:", error);
 

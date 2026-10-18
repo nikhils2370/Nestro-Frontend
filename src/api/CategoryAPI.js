@@ -15,13 +15,13 @@ async function fatchCategory({ status = null, limit = null } = {}) {
     const query = searchParams.toString();
     const url = query ? `/category?${query}` : "/category";
 
-    console.log("Category API URL:", url);
-    console.log("Category API Base URL:", client.defaults.baseURL);
+    // console.log("Category API URL:", url);
+    // console.log("Category API Base URL:", client.defaults.baseURL);
 
     const response = await client.get(url);
 
-    console.log("Category API Status:", response.status);
-    console.log("Category API Response:", response.data);
+    // console.log("Category API Status:", response.status);
+    // console.log("Category API Response:", response.data);
 
     if (response.data?.success) {
       return response.data;

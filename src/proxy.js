@@ -1,18 +1,26 @@
 import { NextResponse } from "next/server";
 
 export function proxy(request) {
-  // Get token from cookie
   const token = request.cookies.get("token")?.value;
+  const { pathname } = request.nextUrl;
 
-  // Token nahi hai -> signin page
-  if (!token) {
-    return NextResponse.redirect(new URL("/signin", request.url));
+  const isProtectedPath =
+    pathname.startsWith("/checkout") ||
+    pathname.startsWith("/account") ||
+    pathname.startsWith("/admin");
+
+  if (isProtectedPath && !token) {
+    const redirectUrl = new URL("/signin", request.url);
+    redirectUrl.searchParams.set("redirect", pathname);
+    return NextResponse.redirect(redirectUrl);
   }
 
-  // Token available -> allow request
   return NextResponse.next();
 }
 
+// Next.js backwards compatibility
+export const middleware = proxy;
+
 export const config = {
-  matcher: "/checkout",
+  matcher: ["/checkout/:path*", "/account/:path*", "/admin/:path*"],
 };
